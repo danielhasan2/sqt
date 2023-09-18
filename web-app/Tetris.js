@@ -471,13 +471,19 @@ Tetris.rotate_ccw = function (game) {
     return R.mergeRight(game, {"current_tetromino": new_rotation});
 };
 
-const descend = function (game) {
+const descend = function (game, points = 0) {
     const new_position = [game.position[0], game.position[1] + 1];
     if (is_blocked(game.field, game.current_tetromino, new_position)) {
         return game;
     }
-    return R.mergeRight(game, {"position": new_position});
+
+    const updatedGame = R.mergeRight(game, {"position": new_position});
+    return {
+        ...updatedGame,
+        score: Score.add_points(points, game.score)
+    };
 };
+
 
 /**
  * Attempt to perform a soft drop, where the piece descends one position.
@@ -492,7 +498,7 @@ Tetris.soft_drop = function (game) {
     if (Tetris.is_game_over(game)) {
         return game;
     }
-    return descend(game);
+    return descend(game, 1);
 };
 
 /**
@@ -509,7 +515,7 @@ Tetris.hard_drop = function (game) {
     if (Tetris.is_game_over(game)) {
         return game;
     }
-    const dropped_once = descend(game);
+    const dropped_once = descend(game, 2);
     if (R.equals(game, dropped_once)) {
         return Tetris.next_turn(game);
     }
@@ -535,7 +541,10 @@ const is_complete_line = (line) => !line.some((block) => block === empty_block);
 const pad_field = function (short_field) {
     const missing_row_count = Tetris.field_height - short_field.length;
     const new_rows = R.times(new_line, missing_row_count);
-    return [...new_rows, ...short_field];
+    return {
+        cleared_field: [...new_rows, ...short_field],
+        linesCleared: missing_row_count
+    };
 };
 
 const clear_lines = R.pipe(
@@ -583,7 +592,9 @@ Tetris.next_turn = function (game) {
     // So lock the current piece in place and deploy the next.
     const locked_field = lock(game);
 
-    const cleared_field = clear_lines(locked_field);
+    const {cleared_field, linesCleared} = clear_lines(locked_field);
+
+    game.score = Score.cleared_lines(linesCleared, game.score);
 
     const [next_tetromino, bag] = game.bag();
 
